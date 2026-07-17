@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Happy GPS</string>
+    <string name="start_mock">啟動模擬</string>
+    <string name="stop_mock">停止模擬</string>
+    <string name="clear_waypoints">清除路徑點</string>
+    <string name="current_speed">速度：%d km/h</string>
+    <string name="locate_me">置中</string>
+    <string name="notification_title">Happy GPS 模擬定位中</string>
+    <string name="notification_desc">虛擬位置正在持續更新...</string>
+    <string name="no_waypoints">請先在地圖上點擊設定路徑點(1, 2, 3...)</string>
+    <string name="permission_rationale">此 App 需要定位權限與發送通知權限以正常啟動模擬定位服務。</string>
+    <string name="settings_dialog_title">需要模擬位置權限</string>
+    <string name="settings_dialog_message">請在系統的「開發人員選項」中，將「Happy GPS」設定為「選取模擬位置應用程式」以開始使用功能。</string>
+    <string name="go_to_settings">去設定</string>
+    <string name="cancel">取消</string>
+    <string name="status_stopped">狀態：未啟動</string>
+    <string name="status_running">狀態：模擬定位中...</string>
+</resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Modern slate and vibrant cyan palette -->
+    <color name="primaryColor">#0F172A</color> <!-- Deep Slate -->
+    <color name="primaryLightColor">#1E293B</color> <!-- Slate Gray -->
+    <color name="primaryDarkColor">#020617</color> <!-- Near Black -->
+    
+    <color name="secondaryColor">#06B6D4</color> <!-- Vibrant Cyan -->
+    <color name="secondaryLightColor">#67E8F9</color>
+    <color name="secondaryDarkColor">#0891B2</color>
+
+    <color name="backgroundColor">#F8FAFC</color> <!-- Cool White -->
+    <color name="cardBackgroundColor">#E2E8F0</color>
+    <color name="panelBackgroundColor">#F8FAFC</color>
+    
+    <color name="textColorPrimary">#0F172A</color>
+    <color name="textColorSecondary">#475569</color>
+    
+    <color name="accentRed">#EF4444</color> <!-- Red for Stop/Clear -->
+    <color name="accentGreen">#10B981</color> <!-- Green for Start -->
+    <color name="accentBlue">#3B82F6</color>
+</resources>
