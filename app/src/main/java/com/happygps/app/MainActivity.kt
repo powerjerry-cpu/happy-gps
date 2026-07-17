@@ -57,14 +57,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var seekBarSpeed: SeekBar
     private lateinit var btnStartStop: Button
     private lateinit var btnClear: Button
+    private lateinit var btnSinglePoint: Button
     private lateinit var fabLocate: FloatingActionButton
     private lateinit var editSearch: EditText
     private lateinit var btnSearch: ImageButton
+    private lateinit var btnClearSearch: ImageButton
     private lateinit var fabFavorite: FloatingActionButton
 
     private val waypoints = ArrayList<GeoPoint>()
     private var speedKmH = 10
     private var isSimulating = false
+    private var isSinglePoint = false
 
     private var mockService: MockLocationService? = null
     private var isBound = false
@@ -148,9 +151,11 @@ class MainActivity : AppCompatActivity() {
         seekBarSpeed = findViewById(R.id.seekBarSpeed)
         btnStartStop = findViewById(R.id.btnStartStop)
         btnClear = findViewById(R.id.btnClear)
+        btnSinglePoint = findViewById(R.id.btnSinglePoint)
         fabLocate = findViewById(R.id.fabLocate)
         editSearch = findViewById(R.id.editSearch)
         btnSearch = findViewById(R.id.btnSearch)
+        btnClearSearch = findViewById(R.id.btnClearSearch)
         fabFavorite = findViewById(R.id.fabFavorite)
 
         // Setup speed text and progress
@@ -281,10 +286,102 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Clear search text button - show/hide based on text content
+        editSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                btnClearSearch.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        btnClearSearch.setOnClickListener {
+            editSearch.setText("")
+            editSearch.clearFocus()
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.hideSoftInputFromWindow(editSearch.windowToken, 0)
+        }
+
         // Favorites action
         fabFavorite.setOnClickListener {
             showFavoritesDialog()
         }
+
+        // Single point GPS button
+        btnSinglePoint.setOnClickListener {
+            if (isSinglePoint) {
+                stopSinglePointMock()
+            } else if (isSimulating) {
+                Toast.makeText(this, "路徑模擬進行中，請先停止再使用單點定位", Toast.LENGTH_SHORT).show()
+            } else {
+                startSinglePointMock()
+            }
+        }
+    }
+
+    private fun startSinglePointMock() {
+        if (waypoints.isEmpty()) {
+            Toast.makeText(this, "請先在地圖上點選一個位置", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val point = waypoints[0]
+
+        // Start Service
+        val serviceIntent = Intent(this, MockLocationService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        handler.postDelayed({
+            if (isBound && mockService != null) {
+                // Use single fixed waypoint list for static position
+                val singleList = ArrayList<GeoPoint>().also { it.add(point) }
+                mockService!!.updateWaypoints(singleList)
+                mockService!!.updateSpeed(1) // minimum speed to keep service alive
+                val success = mockService!!.startSimulation()
+                if (success) {
+                    isSinglePoint = true
+                    isSimulating = true
+                    textStatus.text = "📍 單點定位中"
+                    textStatus.setTextColor(ContextCompat.getColor(this, R.color.accentGreen))
+                    btnSinglePoint.text = "⏹ 停止定位"
+                    btnSinglePoint.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(this, R.color.accentRed))
+                    runnerMarker.position = point
+                    if (!mapView.overlays.contains(runnerMarker)) mapView.overlays.add(runnerMarker)
+                    mapView.controller.animateTo(point)
+                    mapView.invalidate()
+                    Toast.makeText(this, "單點定位已啟動：${point.latitude}, ${point.longitude}", Toast.LENGTH_SHORT).show()
+                } else {
+                    stopSinglePointMock()
+                }
+            }
+        }, 300)
+    }
+
+    private fun stopSinglePointMock() {
+        isSinglePoint = false
+        isSimulating = false
+        if (isBound) {
+            mockService?.stopSimulation()
+            unbindService(serviceConnection)
+            isBound = false
+        }
+        val serviceIntent = Intent(this, MockLocationService::class.java)
+        stopService(serviceIntent)
+
+        textStatus.text = getString(R.string.status_stopped)
+        textStatus.setTextColor(ContextCompat.getColor(this, R.color.textColorSecondary))
+        btnSinglePoint.text = "📍 單點定位"
+        btnSinglePoint.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            android.graphics.Color.parseColor("#FF9800"))
+        if (mapView.overlays.contains(runnerMarker)) mapView.overlays.remove(runnerMarker)
+        mapView.invalidate()
+        Toast.makeText(this, "單點定位已停止", Toast.LENGTH_SHORT).show()
     }
 
     private fun startMockLocation() {
