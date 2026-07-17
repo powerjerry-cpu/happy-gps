@@ -16,6 +16,67 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Floating search card at top -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardSearch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="6dp"
+        app:cardBackgroundColor="@color/panelBackgroundColor"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="4dp">
+
+            <EditText
+                android:id="@+id/editSearch"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="搜尋地點或輸入座標 (緯度,經度)"
+                android:textColor="@color/textColorPrimary"
+                android:textColorHint="@color/textColorSecondary"
+                android:textSize="14sp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:singleLine="true"
+                android:imeOptions="actionSearch" />
+
+            <ImageButton
+                android:id="@+id/btnSearch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="@color/accentBlue" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Favorites FAB -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabFavorite"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="12dp"
+        android:contentDescription="Favorites"
+        android:src="@drawable/ic_heart"
+        app:backgroundTint="@color/panelBackgroundColor"
+        app:fabSize="mini"
+        app:layout_constraintBottom_toTopOf="@+id/fabLocate"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:tint="@color/accentRed" />
+
     <!-- Center position FAB -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabLocate"

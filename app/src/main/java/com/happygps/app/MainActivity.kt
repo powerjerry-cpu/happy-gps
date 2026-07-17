@@ -17,7 +17,14 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -26,6 +33,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import org.json.JSONArray
+import org.json.JSONObject
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -34,6 +43,10 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,6 +58,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStartStop: Button
     private lateinit var btnClear: Button
     private lateinit var fabLocate: FloatingActionButton
+    private lateinit var editSearch: EditText
+    private lateinit var btnSearch: ImageButton
+    private lateinit var fabFavorite: FloatingActionButton
 
     private val waypoints = ArrayList<GeoPoint>()
     private var speedKmH = 10
@@ -133,6 +149,9 @@ class MainActivity : AppCompatActivity() {
         btnStartStop = findViewById(R.id.btnStartStop)
         btnClear = findViewById(R.id.btnClear)
         fabLocate = findViewById(R.id.fabLocate)
+        editSearch = findViewById(R.id.editSearch)
+        btnSearch = findViewById(R.id.btnSearch)
+        fabFavorite = findViewById(R.id.fabFavorite)
 
         // Setup speed text and progress
         seekBarSpeed.progress = speedKmH - 1
@@ -249,6 +268,22 @@ class MainActivity : AppCompatActivity() {
                 GeoPoint(25.033611, 121.564444)
             }
             mapView.controller.animateTo(centerPoint)
+        }
+
+        // Search action
+        btnSearch.setOnClickListener { performSearch() }
+        editSearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performSearch()
+                true
+            } else {
+                false
+            }
+        }
+
+        // Favorites action
+        fabFavorite.setOnClickListener {
+            showFavoritesDialog()
         }
     }
 
@@ -456,6 +491,299 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun performSearch() {
+        val query = editSearch.text.toString().trim()
+        if (query.isEmpty()) return
+
+        // 1. Check if coordinate (lat, lon)
+        val coordRegex = Regex("""^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$""")
+        val match = coordRegex.matchEntire(query)
+        if (match != null) {
+            val lat = match.groupValues[1].toDoubleOrNull()
+            val lon = match.groupValues[2].toDoubleOrNull()
+            if (lat != null && lon != null) {
+                val point = GeoPoint(lat, lon)
+                mapView.controller.animateTo(point)
+                
+                // If not simulating, prompt to add waypoint
+                if (!isSimulating) {
+                    AlertDialog.Builder(this)
+                        .setMessage("已定位至座標 ($lat, $lon)\n是否新增為路徑點？")
+                        .setPositiveButton("新增") { _, _ ->
+                            waypoints.add(point)
+                            updateWaypointsCountText()
+                            redrawMapOverlays()
+                            mockService?.updateWaypoints(waypoints)
+                        }
+                        .setNegativeButton("僅移動", null)
+                        .show()
+                }
+                return
+            }
+        }
+
+        // 2. Text Search using Nominatim API in background thread
+        thread {
+            try {
+                val url = URL("https://nominatim.openstreetmap.org/search?q=" + URLEncoder.encode(query, "UTF-8") + "&format=json&limit=1")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.setRequestProperty("User-Agent", "HappyGPS/1.0")
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
+                
+                if (connection.responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    val jsonArray = JSONArray(response)
+                    if (jsonArray.length() > 0) {
+                        val first = jsonArray.getJSONObject(0)
+                        val lat = first.getDouble("lat")
+                        val lon = first.getDouble("lon")
+                        val displayName = first.getString("display_name")
+                        
+                        runOnUiThread {
+                            val point = GeoPoint(lat, lon)
+                            mapView.controller.animateTo(point)
+                            
+                            if (!isSimulating) {
+                                AlertDialog.Builder(this@MainActivity)
+                                    .setTitle("搜尋結果")
+                                    .setMessage("找到地點：$displayName\n\n是否新增為路徑點？")
+                                    .setPositiveButton("新增") { _, _ ->
+                                        waypoints.add(point)
+                                        updateWaypointsCountText()
+                                        redrawMapOverlays()
+                                        mockService?.updateWaypoints(waypoints)
+                                    }
+                                    .setNegativeButton("僅移動", null)
+                                    .show()
+                            } else {
+                                Toast.makeText(this@MainActivity, "找到地點：$displayName", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    } else {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "找不到該地點", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "搜尋失敗，伺服器錯誤: ${connection.responseCode}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "搜尋出錯: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun getFavorites(): ArrayList<Pair<String, ArrayList<GeoPoint>>> {
+        val list = ArrayList<Pair<String, ArrayList<GeoPoint>>>()
+        val prefs = getSharedPreferences("happy_gps_prefs", Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString("favorites", null) ?: return list
+        try {
+            val array = JSONArray(jsonStr)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val name = obj.getString("name")
+                val pointsArray = obj.getJSONArray("points")
+                val points = ArrayList<GeoPoint>()
+                for (j in 0 until pointsArray.length()) {
+                    val pObj = pointsArray.getJSONObject(j)
+                    points.add(GeoPoint(pObj.getDouble("lat"), pObj.getDouble("lon")))
+                }
+                list.add(Pair(name, points))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    private fun saveFavorites(list: ArrayList<Pair<String, ArrayList<GeoPoint>>>) {
+        val prefs = getSharedPreferences("happy_gps_prefs", Context.MODE_PRIVATE)
+        try {
+            val array = JSONArray()
+            for (item in list) {
+                val obj = JSONObject()
+                obj.put("name", item.first)
+                val pointsArray = JSONArray()
+                for (gp in item.second) {
+                    val pObj = JSONObject()
+                    pObj.put("lat", gp.latitude)
+                    pObj.put("lon", gp.longitude)
+                    pointsArray.put(pObj)
+                }
+                obj.put("points", pointsArray)
+                array.put(obj)
+            }
+            prefs.edit().putString("favorites", array.toString()).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun showFavoritesDialog() {
+        val favoritesList = getFavorites()
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("我的最愛路徑")
+
+        val context = this
+        val dpScale = resources.displayMetrics.density
+        fun Int.dp() = (this * dpScale).toInt()
+
+        val scrollView = ScrollView(context)
+        val rootLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16.dp(), 16.dp(), 16.dp(), 16.dp())
+        }
+        scrollView.addView(rootLayout)
+
+        var dialog: AlertDialog? = null
+
+        // 1. Save current route if available
+        if (waypoints.isNotEmpty()) {
+            val titleSave = TextView(context).apply {
+                text = "儲存目前設定好的路徑"
+                textSize = 14f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+                setPadding(0, 0, 0, 8.dp())
+            }
+            rootLayout.addView(titleSave)
+
+            val inputName = EditText(context).apply {
+                hint = "請輸入路徑名稱"
+                setSingleLine(true)
+                textSize = 14f
+                setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+            }
+            rootLayout.addView(inputName)
+
+            val btnSave = Button(context).apply {
+                text = "儲存目前路徑"
+                setBackgroundColor(ContextCompat.getColor(context, R.color.accentBlue))
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setOnClickListener {
+                    val name = inputName.text.toString().trim()
+                    if (name.isEmpty()) {
+                        Toast.makeText(context, "請輸入名稱", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    if (favoritesList.any { it.first == name }) {
+                        Toast.makeText(context, "已有相同名稱的路徑", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    val newPoints = ArrayList(waypoints)
+                    favoritesList.add(Pair(name, newPoints))
+                    saveFavorites(favoritesList)
+                    Toast.makeText(context, "儲存成功", Toast.LENGTH_SHORT).show()
+                    dialog?.dismiss()
+                }
+            }
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(0, 8.dp(), 0, 16.dp())
+            }
+            rootLayout.addView(btnSave, lp)
+
+            val divider = View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1.dp()).apply {
+                    setMargins(0, 0, 0, 16.dp())
+                }
+                setBackgroundColor(Color.parseColor("#DDDDDD"))
+            }
+            rootLayout.addView(divider)
+        }
+
+        // 2. Saved routes list
+        val titleList = TextView(context).apply {
+            text = "已儲存的最愛路徑 (${favoritesList.size})"
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+            setPadding(0, 0, 0, 8.dp())
+        }
+        rootLayout.addView(titleList)
+
+        if (favoritesList.isEmpty()) {
+            val emptyText = TextView(context).apply {
+                text = "尚無最愛路徑"
+                textSize = 14f
+                setTextColor(ContextCompat.getColor(context, R.color.textColorSecondary))
+                gravity = Gravity.CENTER
+                setPadding(0, 16.dp(), 0, 16.dp())
+            }
+            rootLayout.addView(emptyText)
+        } else {
+            for (fav in favoritesList) {
+                val rowLayout = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, 4.dp(), 0, 4.dp())
+                }
+
+                val pathText = TextView(context).apply {
+                    text = fav.first
+                    textSize = 15f
+                    setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    setOnClickListener {
+                        if (isSimulating) {
+                            Toast.makeText(context, "模擬進行中，請先停止再載入路徑", Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                        waypoints.clear()
+                        waypoints.addAll(fav.second)
+                        updateWaypointsCountText()
+                        redrawMapOverlays()
+                        mockService?.updateWaypoints(waypoints)
+                        Toast.makeText(context, "已載入最愛路徑「${fav.first}」", Toast.LENGTH_SHORT).show()
+                        if (waypoints.isNotEmpty()) {
+                            mapView.controller.animateTo(waypoints[0])
+                        }
+                        dialog?.dismiss()
+                    }
+                }
+                rowLayout.addView(pathText)
+
+                val btnDelete = ImageButton(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(40.dp(), 40.dp())
+                    val attrs = intArrayOf(android.R.attr.selectableItemBackgroundBorderless)
+                    val typedArray = context.obtainStyledAttributes(attrs)
+                    val backgroundResource = typedArray.getResourceId(0, 0)
+                    setBackgroundResource(backgroundResource)
+                    typedArray.recycle()
+                    
+                    setImageResource(android.R.drawable.ic_menu_delete)
+                    setColorFilter(ContextCompat.getColor(context, R.color.accentRed))
+                    contentDescription = "刪除"
+                    setOnClickListener {
+                        AlertDialog.Builder(context)
+                            .setMessage("確定要刪除「${fav.first}」嗎？")
+                            .setPositiveButton("確定") { _, _ ->
+                                favoritesList.remove(fav)
+                                saveFavorites(favoritesList)
+                                Toast.makeText(context, "已刪除", Toast.LENGTH_SHORT).show()
+                                dialog?.dismiss()
+                                showFavoritesDialog()
+                            }
+                            .setNegativeButton("取消", null)
+                            .show()
+                    }
+                }
+                rowLayout.addView(btnDelete)
+
+                rootLayout.addView(rowLayout)
+            }
+        }
+
+        builder.setView(scrollView)
+        builder.setNegativeButton("關閉", null)
+        dialog = builder.show()
     }
 
     override fun onResume() {
