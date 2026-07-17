@@ -22,4 +22,5 @@
     <color name="accentRed">#EF4444</color> <!-- Red for Stop/Clear -->
     <color name="accentGreen">#10B981</color> <!-- Green for Start -->
     <color name="accentBlue">#3B82F6</color>
+    <color name="icon_background">#A2D5F9</color>
 </resources>
