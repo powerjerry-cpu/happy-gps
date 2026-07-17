@@ -650,16 +650,17 @@ class MainActivity : AppCompatActivity() {
                 text = "儲存目前設定好的路徑"
                 textSize = 14f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+                setTextColor(Color.WHITE)
                 setPadding(0, 0, 0, 8.dp())
             }
             rootLayout.addView(titleSave)
 
             val inputName = EditText(context).apply {
                 hint = "請輸入路徑名稱"
+                setHintTextColor(Color.parseColor("#888888"))
                 setSingleLine(true)
                 textSize = 14f
-                setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+                setTextColor(Color.WHITE)
             }
             rootLayout.addView(inputName)
 
@@ -694,7 +695,7 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1.dp()).apply {
                     setMargins(0, 0, 0, 16.dp())
                 }
-                setBackgroundColor(Color.parseColor("#DDDDDD"))
+                setBackgroundColor(Color.parseColor("#555555"))
             }
             rootLayout.addView(divider)
         }
@@ -704,7 +705,7 @@ class MainActivity : AppCompatActivity() {
             text = "已儲存的最愛路徑 (${favoritesList.size})"
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+            setTextColor(Color.WHITE)
             setPadding(0, 0, 0, 8.dp())
         }
         rootLayout.addView(titleList)
@@ -713,7 +714,7 @@ class MainActivity : AppCompatActivity() {
             val emptyText = TextView(context).apply {
                 text = "尚無最愛路徑"
                 textSize = 14f
-                setTextColor(ContextCompat.getColor(context, R.color.textColorSecondary))
+                setTextColor(Color.parseColor("#CCCCCC"))
                 gravity = Gravity.CENTER
                 setPadding(0, 16.dp(), 0, 16.dp())
             }
@@ -729,7 +730,7 @@ class MainActivity : AppCompatActivity() {
                 val pathText = TextView(context).apply {
                     text = fav.first
                     textSize = 15f
-                    setTextColor(ContextCompat.getColor(context, R.color.textColorPrimary))
+                    setTextColor(Color.parseColor("#FFEB3B")) // Bright Yellow
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     setOnClickListener {
                         if (isSimulating) {
